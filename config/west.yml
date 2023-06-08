@@ -6,8 +6,8 @@ manifest:
       url-base: https://github.com/seanuleh
   projects:
     - name: zmk
-      remote: zmkfirmware
-      revision: main
+      remote: seanuleh
+      revision: dongle
       import: app/west.yml
   self:
     path: config
