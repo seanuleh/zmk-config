@@ -13,12 +13,12 @@
 #
 ---
 include:
-  - board: nrfmicro
+  - board: nrfmicro_13
     shield: sofle_left
-  - board: nrfmicro
+  - board: nrfmicro_13
     shield: sofle_right
-  - board: nrfmicro
+  - board: nrfmicro_13
     shield: sofle_dongle
-  - board: nrfmicro
+  - board: nrfmicro_13
     shield: settings_reset
     
