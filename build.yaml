@@ -14,9 +14,9 @@
 ---
 include:
   - board: nrfmicro_13
-    shield: sofle_left
+    shield: sofle_left nice_view_adapter nice_view
   - board: nrfmicro_13
-    shield: sofle_right
+    shield: sofle_right nice_view_adapter nice_view
   - board: nrfmicro_13
     shield: sofle_dongle
   - board: nrfmicro_13
