@@ -1,6 +1,6 @@
 {
-    "id": "sofle",
-    "name": "Sofle",
+    "id": "sofled",
+    "name": "SofleDongle",
     "layouts": {
       "default_transform": {
         "name": "default_transform",
