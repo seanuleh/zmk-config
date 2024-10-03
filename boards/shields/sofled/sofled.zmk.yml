@@ -1,5 +1,5 @@
 file_format: "1"
-id: sofle
+id: sofled
 name: Sofle
 type: shield
 url: https://github.com/josefadamcik/SofleKeyboard
@@ -11,5 +11,5 @@ features:
   - encoder
   - underglow
 siblings:
-  - sofle_left
-  - sofle_right
+  - sofled_left
+  - sofled_right
