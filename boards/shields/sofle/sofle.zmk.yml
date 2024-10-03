@@ -9,7 +9,7 @@ features:
   - keys
   - display
   - encoder
+  - underglow
 siblings:
   - sofle_left
   - sofle_right
-  - sofle_dongle
