@@ -1,7 +1,7 @@
 # Copyright (c) 2020 Ryan Cross
 # SPDX-License-Identifier: MIT
 
-if SHIELD_SOFLE_LEFT
+if SHIELD_SOFLED_DONGLE
 
 config ZMK_KEYBOARD_NAME
     default "Sofle"
@@ -9,9 +9,12 @@ config ZMK_KEYBOARD_NAME
 config ZMK_SPLIT_ROLE_CENTRAL
     default y
 
+config ZMK_SPLIT
+    default y
+
 endif
 
-if SHIELD_SOFLE_LEFT || SHIELD_SOFLE_RIGHT
+if SHIELD_SOFLED_LEFT || SHIELD_SOFLED_RIGHT || SHIELD_SOFLED_DONGLE
 
 config ZMK_SPLIT
     default y
