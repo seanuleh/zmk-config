@@ -16,8 +16,8 @@ endif
 
 if SHIELD_SOFLED_LEFT || SHIELD_SOFLED_RIGHT || SHIELD_SOFLED_DONGLE
 
-config ZMK_SPLIT
-    default y
+ config ZMK_SPLIT
+     default y
 
 if ZMK_DISPLAY
 
