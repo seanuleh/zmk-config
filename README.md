@@ -7,4 +7,4 @@ Dongle: [nrfMicro](https://github.com/joric/nrfmicro) (v1.3) with OLED Dispaly
 * Custom 'sofled' board/shield for Sofle with Dongle
 
 # Layout
-![layout](layout.png)
+![layout](sofled.svg)
