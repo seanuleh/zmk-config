@@ -12,13 +12,19 @@ jobs:
   
   draw:
     needs: [build]
-    uses: caksoylar/keymap-drawer/.github/workflows/draw-zmk.yml@main
-    permissions:
-      contents: write  # allow workflow to commit to the repo
-    with:
-      keymap_patterns: "config/sofled.keymap"        # path to the keymaps to parse
-      config_path: "keymap_drawer.config.yaml"  # config file, ignored if not exists
-      output_folder: "keymap-drawer"            # path to save produced SVG and keymap YAML files
-      parse_args: ""  # map of extra args to pass to `keymap parse`, e.g. "corne:'-l Def Lwr Rse' cradio:''"
-      draw_args: ""   # map of extra args to pass to `keymap draw`, e.g. "corne:'-k corne_rotated' cradio:'-k paroxysm'"
-      commit_message: "[Draw] ${{ github.event.head_commit.message }} [skip ci]"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Packages
+        uses: threeal/pipx-install-action@v2.0.0
+        with:
+          packages: keymap-drawer
+      - run: |
+        keymap -c keymap_drawer.config.yaml parse -c 14 -z config/sofled.keymap >sofled_keymap.yaml
+        yq '.layers |= (to_entries | .[0:3] + (.[] | select(.key == "SYS")) | from_entries)' sofled_keymap.yaml > sofled_keymap_filtered.yaml
+        keymap -c keymap_drawer.config.yaml draw sofled_keymap_filtered.yaml -k sofle_choc > sofled.svg
+        open sofled.svg
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          file_pattern: 'sofled.svg'
+          commit_message: Draw Layout [skip ci]
