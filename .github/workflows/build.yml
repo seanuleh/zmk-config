@@ -9,18 +9,16 @@ concurrency:
 jobs:
   build:
     uses: zmkfirmware/zmk/.github/workflows/build-user-config.yml@main
-
-  layout:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.23'
-      - run: |
-          go install github.com/mrmarble/zmk-viewer/cmd/zmk-viewer@latest
-          zmk-viewer generate -f ./config/sofled.keymap -l ./config/info.json layout -s
-      - uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          file_pattern: 'layout.png'
-          commit_message: Update layout image [skip ci]
+  
+  draw:
+    needs: [build]
+    uses: caksoylar/keymap-drawer/.github/workflows/draw-zmk.yml@main
+    permissions:
+      contents: write  # allow workflow to commit to the repo
+    with:
+      keymap_patterns: "config/sofled.keymap"        # path to the keymaps to parse
+      config_path: "keymap_drawer.config.yaml"  # config file, ignored if not exists
+      output_folder: "keymap-drawer"            # path to save produced SVG and keymap YAML files
+      parse_args: ""  # map of extra args to pass to `keymap parse`, e.g. "corne:'-l Def Lwr Rse' cradio:''"
+      draw_args: ""   # map of extra args to pass to `keymap draw`, e.g. "corne:'-k corne_rotated' cradio:'-k paroxysm'"
+      commit_message: "[Draw] ${{ github.event.head_commit.message }} [skip ci]"
