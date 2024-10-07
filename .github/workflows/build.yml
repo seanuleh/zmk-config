@@ -15,15 +15,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Install Packages
         uses: threeal/pipx-install-action@v2.0.0
         with:
           packages: keymap-drawer
-      - shell: |
-        keymap -c keymap_drawer.config.yaml parse -c 14 -z config/sofled.keymap >sofled_keymap.yaml
-        yq '.layers |= (to_entries | .[0:3] + (.[] | select(.key == "SYS")) | from_entries)' sofled_keymap.yaml > sofled_keymap_filtered.yaml
-        keymap -c keymap_drawer.config.yaml draw sofled_keymap_filtered.yaml -k sofle_choc > sofled.svg
-        open sofled.svg
+
+      - name: Generate Keymap SVG
+        run: |
+          keymap -c keymap_drawer.config.yaml parse -c 14 -z config/sofled.keymap >sofled_keymap.yaml
+          yq '.layers |= (to_entries | .[0:3] + (.[] | select(.key == "SYS")) | from_entries)' sofled_keymap.yaml > sofled_keymap_filtered.yaml
+          keymap -c keymap_drawer.config.yaml draw sofled_keymap_filtered.yaml -k sofle_choc > sofled.svg
+          open sofled.svg
+          
       - uses: stefanzweifel/git-auto-commit-action@v5
         with:
           file_pattern: 'sofled.svg'
