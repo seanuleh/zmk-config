@@ -99,6 +99,22 @@
         };
     };
 
+    macros {
+        profile_bt: profile_bt {
+            compatible = "zmk,behavior-macro";
+            #binding-cells = <0>;
+            bindings = <&out OUT_BLE &bt BT_SEL 0 &to 4>;
+            label = "PROFILE_BT";
+        };
+
+        profile_usb: profile_usb {
+            compatible = "zmk,behavior-macro";
+            #binding-cells = <0>;
+            bindings = <&out OUT_USB &to 0>;
+            label = "PROFILE_USB";
+        };
+    };
+
     keymap {
         compatible = "zmk,keymap";
 
@@ -194,11 +210,11 @@
 
         SYS {
             bindings = <
-&to 0              &to 1            &to 2            &to 3            &to 4         &to 5                       &to 6  &to 7  &to 8  &to 9  &to 0  &none
-&ext_power EP_ON   &rgb_ug RGB_HUI  &rgb_ug RGB_BRI  &rgb_ug RGB_EFF  &none         &none                       &none  &none  &none  &none  &none  &none
-&ext_power EP_OFF  &rgb_ug RGB_HUD  &rgb_ug RGB_BRD  &rgb_ug RGB_TOG  &none         &none                       &none  &none  &none  &none  &none  &none
-&bt BT_CLR         &bt BT_SEL 0     &bt BT_SEL 1     &bt BT_SEL 2     &out OUT_BLE  &out OUT_USB  &none  &none  &none  &none  &none  &none  &none  &none
-                                    &trans           &none            &none         &none         &none  &none  &none  &none  &none  &none
+&to 0              &to 1            &to 2            &to 3            &to 4         &to 5                     &to 6  &to 7  &to 8  &to 9  &to 0  &none
+&ext_power EP_ON   &rgb_ug RGB_HUI  &rgb_ug RGB_BRI  &rgb_ug RGB_EFF  &none         &none                     &none  &none  &none  &none  &none  &none
+&ext_power EP_OFF  &rgb_ug RGB_HUD  &rgb_ug RGB_BRD  &rgb_ug RGB_TOG  &none         &none                     &none  &none  &none  &none  &none  &none
+&profile_usb       &profile_bt      &bt BT_SEL 0     &bt BT_SEL 1     &bt BT_SEL 2  &none  &bt BT_CLR  &none  &none  &none  &none  &none  &none  &none
+                                    &trans           &none            &none         &none  &none       &none  &none  &none  &none  &none
             >;
         };
     };
