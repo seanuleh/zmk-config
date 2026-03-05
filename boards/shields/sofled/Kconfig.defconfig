@@ -48,7 +48,7 @@ endif # LVGL
 
 if ZMK_RGB_UNDERGLOW
 
-config WS2812_STRIP
+config LED_STRIP
     default y
 endif
 
