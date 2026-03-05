@@ -1,12 +1,12 @@
 ---
 include:
-  - board: nice_nano_v2
+  - board: nice_nano/v2
     shield: sofled_left nice_view_adapter nice_view
-  - board: nice_nano_v2
+  - board: nice_nano/v2
     shield: sofled_right nice_view_adapter nice_view
-  - board: nrfmicro_13
+  - board: nrfmicro/13
     shield: sofled_dongle
-  - board: nrfmicro_13
+  - board: nrfmicro/13
     shield: settings_reset
-  - board: nice_nano_v2
+  - board: nice_nano/v2
     shield: settings_reset
