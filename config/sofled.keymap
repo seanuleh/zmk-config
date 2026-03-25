@@ -130,7 +130,7 @@
 
         LOWER {
             bindings = <
-&as LS(GRAVE) GRAVE  &kp LS(F1)  &kp LS(F2)  &kp LS(F3)  &none           &none                                 &trans                 &trans             &trans  &trans  &trans  &none
+&as LS(GRAVE) GRAVE  &kp LS(F1)  &kp LS(F2)  &kp LS(F3)  &kp LS(F4)      &none                                 &trans                 &trans             &trans  &trans  &trans  &none
 &trans               &none       &kp TILDE   &kp GRAVE   &kp SQT         &kp LEFT_BRACE                        &kp RIGHT_BRACE        &kp DOUBLE_QUOTES  &none   &none   &none   &as LA(DELETE) DELETE
 &trans               &none       &none       &none       &kp MINUS       &kp LEFT_PARENTHESIS                  &kp RIGHT_PARENTHESIS  &kp PLUS           &none   &none   &trans  &trans
 &trans               &none       &none       &none       &kp UNDERSCORE  &kp LEFT_BRACKET      &none   &none   &kp RIGHT_BRACKET      &kp EQUAL          &trans  &trans  &trans  &none
