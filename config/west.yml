@@ -4,13 +4,15 @@ manifest:
       url-base: https://github.com/zmkfirmware
     - name: lennyitb
       url-base: https://github.com/lennyitb
+    - name: seanuleh
+      url-base: https://github.com/seanuleh
   projects:
     - name: zmk
       remote: zmkfirmware
       revision: main
       import: app/west.yml
     - name: zmk-layer-report
-      remote: lennyitb
+      remote: seanuleh
       revision: main
   self:
     path: config
