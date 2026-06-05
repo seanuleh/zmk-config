@@ -29,7 +29,7 @@ static void apply_portrait_rotation(void) {
      * coordinates (CANVAS_W x CANVAS_H = 68 x 160). */
     lv_disp_t *disp = lv_disp_get_default();
     if (disp != NULL) {
-        lv_disp_set_rotation(disp, LV_DISP_ROT_90);
+        lv_disp_set_rotation(disp, LV_DISP_ROTATION_90);
     }
 }
 
