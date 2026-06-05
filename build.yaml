@@ -1,9 +1,9 @@
 ---
 include:
   - board: nice_nano/nrf52840/zmk
-    shield: sofled_left nice_view_adapter
+    shield: sofled_left nice_view_adapter nice_view
   - board: nice_nano/nrf52840/zmk
-    shield: sofled_right nice_view_adapter
+    shield: sofled_right nice_view_adapter nice_view
   - board: nrfmicro/nrf52840/zmk
     shield: sofled_dongle
   - board: nrfmicro/nrf52840/zmk
