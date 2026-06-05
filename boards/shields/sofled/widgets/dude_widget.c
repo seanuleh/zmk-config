@@ -19,7 +19,9 @@
 #include <zmk/event_manager.h>
 #include <zmk/events/position_state_changed.h>
 #include <zmk/events/battery_state_changed.h>
+#include <zmk/events/split_peripheral_status_changed.h>
 #include <zmk/battery.h>
+#include <zmk/split/bluetooth/peripheral.h>
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
@@ -150,6 +152,18 @@ static void apply_frame(struct dude_widget *w, enum dude_state s) {
     if (w->caption) {
         lv_label_set_text(w->caption, label_for_state(s));
     }
+    if (w->batt_label) {
+        lv_label_set_text_fmt(w->batt_label, "%u%%", batt_pct);
+    }
+    if (w->conn_label) {
+        bool conn = zmk_split_bt_peripheral_is_connected();
+        /* When connected, show WIFI + tick. When disconnected, just the
+         * WIFI symbol — drops the trailing glyph entirely so the wifi
+         * icon's position stays fixed regardless of state. */
+        lv_label_set_text(w->conn_label,
+                          conn ? LV_SYMBOL_WIFI " " LV_SYMBOL_OK
+                               : LV_SYMBOL_WIFI);
+    }
 }
 
 /* ----- periodic tick ----- */
@@ -158,9 +172,9 @@ static void dude_tick_handler(struct k_work *work);
 static K_WORK_DELAYABLE_DEFINE(dude_tick_work, dude_tick_handler);
 
 static void schedule_tick(void) {
-    /* 250ms feels animated enough for the walk cycle without thrashing
-     * the Sharp LCD (each frame swap is a visible refresh). */
-    k_work_schedule(&dude_tick_work, K_MSEC(250));
+    /* 120ms — snappy state changes; redraws are still skipped when the
+     * actual frame doesn't change so idle is quiet. */
+    k_work_schedule(&dude_tick_work, K_MSEC(120));
 }
 
 static void dude_tick_handler(struct k_work *work) {
@@ -206,6 +220,15 @@ static int dude_key_listener(const zmk_event_t *eh) {
 ZMK_LISTENER(dude_key, dude_key_listener);
 ZMK_SUBSCRIPTION(dude_key, zmk_position_state_changed);
 
+static int dude_conn_listener(const zmk_event_t *eh) {
+    /* Force a redraw next tick by clearing last_frame so apply_frame
+     * re-emits even if the dude state hasn't changed. */
+    last_frame = NULL;
+    return 0;
+}
+ZMK_LISTENER(dude_conn, dude_conn_listener);
+ZMK_SUBSCRIPTION(dude_conn, zmk_split_peripheral_status_changed);
+
 #if IS_ENABLED(CONFIG_ZMK_BATTERY_REPORTING)
 static int dude_batt_listener(const zmk_event_t *eh) {
     const struct zmk_battery_state_changed *ev = as_zmk_battery_state_changed(eh);
@@ -232,20 +255,62 @@ int dude_widget_init(struct dude_widget *w, lv_obj_t *parent) {
 
     w->sprite = lv_image_create(parent);
     lv_image_set_src(w->sprite, &dude_idle);
-    /* Kill the mono theme's container chrome (bg + border) which paints
-     * a pulsing opaque box around the sprite. Keep the default layout
-     * styles intact so the widget auto-sizes to the image. */
     lv_obj_set_style_bg_opa(w->sprite, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_opa(w->sprite, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(w->sprite, 0, 0);
     lv_obj_set_style_pad_all(w->sprite, 0, 0);
-    /* firmware-RIGHT maps to user-TOP on this mount */
-    lv_obj_align(w->sprite, LV_ALIGN_RIGHT_MID, -8, 0);
+    /* Stack the dude + caption as a vertically centered group in the
+     * user's view. Firmware-X is the user-vertical axis; positive X
+     * offset = toward user-top. Dude sits above the caption. */
+    lv_obj_align(w->sprite, LV_ALIGN_CENTER, 12, 0);
 
-    /* Caption omitted for now — text labels need runtime rotation
-     * (lv_obj_set_style_transform_rotation) which I'll wire as polish.
-     * The sprite's expression alone telegraphs the current state. */
-    w->caption = NULL;
+    /* Caption beneath the sprite, rotated 90deg via LVGL style transform.
+     * Strip all container chrome so no axis-aligned background box gets
+     * painted (mono theme would otherwise draw an opaque rect). */
+    w->caption = lv_label_create(parent);
+    lv_label_set_text(w->caption, "idle");
+    lv_obj_set_style_bg_opa(w->caption, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_opa(w->caption, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(w->caption, 0, 0);
+    lv_obj_set_style_pad_all(w->caption, 0, 0);
+    /* Fix the label's size so we know what its bounding box is, then set
+     * the pivot to its center so rotation happens in place. */
+    lv_obj_set_size(w->caption, 50, 14);
+    lv_obj_set_style_text_align(w->caption, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_transform_pivot_x(w->caption, 25, 0);
+    lv_obj_set_style_transform_pivot_y(w->caption, 7, 0);
+    lv_obj_set_style_transform_rotation(w->caption, 900, 0);
+    lv_obj_align(w->caption, LV_ALIGN_CENTER, -38, 0);
+
+    /* Status row at user-TOP (firmware-RIGHT edge). User-RIGHT = battery%,
+     * user-LEFT = wifi+tick. Both rotated 90deg. y_offset controls
+     * user-horizontal position (firmware-Y); smaller |y_offset| = further
+     * from the user-side-edge. */
+    static const struct { int pivot_x, pivot_y, w, h, y_offset; const char *initial; } slots[] = {
+        { 16, 7, 32, 14, +12, "..%" },                          /* batt → user-right (pad from edge) */
+        { 14, 7, 28, 14, -18, LV_SYMBOL_WIFI " " LV_SYMBOL_OK },/* conn → user-left */
+    };
+    lv_obj_t **targets[] = { &w->batt_label, &w->conn_label };
+    for (int i = 0; i < 2; i++) {
+        lv_obj_t *l = lv_label_create(parent);
+        lv_label_set_text(l, slots[i].initial);
+        lv_obj_set_style_bg_opa(l, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_opa(l, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(l, 0, 0);
+        lv_obj_set_style_pad_all(l, 0, 0);
+        lv_obj_set_size(l, slots[i].w, slots[i].h);
+        /* Left-align so a varying-width trailing glyph (tick/blank)
+         * doesn't shift the leading icon. */
+        lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_LEFT, 0);
+        lv_obj_set_style_transform_pivot_x(l, slots[i].pivot_x, 0);
+        lv_obj_set_style_transform_pivot_y(l, slots[i].pivot_y, 0);
+        lv_obj_set_style_transform_rotation(l, 900, 0);
+        lv_obj_align(l, LV_ALIGN_RIGHT_MID, -2, slots[i].y_offset);
+        *targets[i] = l;
+    }
+    /* Crisp pixel font for the battery percentage; the WIFI/OK symbol
+     * stays in Montserrat because Unscii's symbol coverage is limited. */
+    lv_obj_set_style_text_font(w->batt_label, &lv_font_unscii_8, 0);
 
     schedule_tick();
     return 0;
