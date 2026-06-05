@@ -27,6 +27,16 @@ config I2C
 config SSD1306
     default y
 
+# Our custom screen replaces nice_view's. Suppress nice_view's widget
+# when our shield's custom screen is enabled.
+config NICE_VIEW_WIDGET_STATUS
+    default n if SOFLED_CUSTOM_STATUS_SCREEN
+
+config SOFLED_CUSTOM_STATUS_SCREEN
+    bool "Sofle portrait custom status screen (Claude dude + WPM graph)"
+    depends on ZMK_DISPLAY_STATUS_SCREEN_CUSTOM
+    default y
+
 endif # ZMK_DISPLAY
 
 if LVGL
