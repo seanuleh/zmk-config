@@ -155,12 +155,12 @@ static void dude_tick_handler(struct k_work *work) {
 
     /* one-shot blink during idle */
     if (next_blink_ms == 0) {
-        next_blink_ms = now + 3000 + (sys_rand32_get() % 3000);
+        next_blink_ms = now + 3000 + (((uint32_t)now * 1103515245u + 12345u) % 3000u);
     }
     if (cur_state == DS_IDLE && now >= next_blink_ms) {
         blink_now = !blink_now;
         if (!blink_now) {
-            next_blink_ms = now + 3000 + (sys_rand32_get() % 3000);
+            next_blink_ms = now + 3000 + (((uint32_t)now * 1103515245u + 12345u) % 3000u);
         }
     } else {
         blink_now = false;
