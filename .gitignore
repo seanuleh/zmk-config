@@ -1,0 +1,8 @@
+# West workspace artifacts (populated by `west update` for local builds)
+.west/
+build/
+modules/
+optional/
+zephyr/
+zmk/
+zmk-layer-report/
