@@ -1,10 +1,11 @@
 /*
- * Sofle portrait custom status screen.
+ * Sofle custom status screen for nice!view halves (160x68 landscape).
  *
- * Rotates the display 90deg so we author in portrait coords (68x160), then
- * mounts the appropriate widget for this half:
- *   - left  : animated Claude critter (dude_widget)
- *   - right : live WPM graph (wpm_graph_widget)
+ * Note: native display orientation is landscape. The halves are physically
+ * mounted vertically, so content is authored sideways here on purpose —
+ * the user reads it by tilting their head, or we'll address orientation
+ * via devicetree rotation in a follow-up (LVGL software rotation needs a
+ * larger render buffer than what's allocated for nice!view).
  *
  * SPDX-License-Identifier: MIT
  */
@@ -25,31 +26,23 @@ static struct dude_widget left_widget;
 static struct wpm_graph_widget right_widget;
 #endif
 
-static void apply_portrait_rotation(void) {
-    lv_disp_t *disp = lv_disp_get_default();
-    if (disp != NULL) {
-        lv_disp_set_rotation(disp, LV_DISP_ROTATION_90);
-    }
-}
-
 lv_obj_t *zmk_display_status_screen(void) {
-    apply_portrait_rotation();
-
+    /* Halves are physically mounted vertically. LVGL software rotation
+     * doesn't take on the sharp ls0xx driver, so we pre-rotate sprite
+     * data instead and lay widgets along the long axis (X = top-bottom
+     * from the user's perspective). */
     lv_obj_t *screen = lv_obj_create(NULL);
-    lv_obj_set_style_bg_color(screen, lv_color_black(), LV_PART_MAIN);
+    /* The mono theme applies an opaque background to the screen object
+     * which LVGL repaints on every refresh. On a Sharp Memory LCD that
+     * shows up as a continuous flicker. Strip ALL styles from the screen
+     * so it stays naturally reflective (no draw) wherever no widget is
+     * placed. Widgets get their own styles re-applied as needed. */
+    lv_obj_remove_style_all(screen);
 
 #if IS_ENABLED(CONFIG_SHIELD_SOFLED_LEFT)
     dude_widget_init(&left_widget, screen);
-    lv_obj_align(left_widget.obj, LV_ALIGN_TOP_MID, 0, 0);
 #elif IS_ENABLED(CONFIG_SHIELD_SOFLED_RIGHT)
     wpm_graph_widget_init(&right_widget, screen);
-    lv_obj_align(right_widget.obj, LV_ALIGN_TOP_MID, 0, 0);
-#else
-    /* Fallback stub for the dongle if its display is ever enabled */
-    lv_obj_t *label = lv_label_create(screen);
-    lv_label_set_text(label, "sofle");
-    lv_obj_set_style_text_color(label, lv_color_white(), LV_PART_MAIN);
-    lv_obj_center(label);
 #endif
 
     return screen;

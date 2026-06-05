@@ -2,7 +2,7 @@
  * Auto-generated Claude critter sprite frames (1-bit A1 format).
  * Source: /tmp/sofle_sprites.py
  *
- * Each frame is 56x40 pixels packed MSB-first, rows padded to bytes.
+ * Each frame is 40x56 pixels packed MSB-first, rows padded to bytes.
  * SPDX-License-Identifier: MIT
  */
 #pragma once
@@ -20,5 +20,5 @@ extern const lv_image_dsc_t dude_sleep;
 extern const lv_image_dsc_t dude_mash;
 extern const lv_image_dsc_t dude_droop;
 
-#define DUDE_SPRITE_W 56
-#define DUDE_SPRITE_H 40
+#define DUDE_SPRITE_W 40
+#define DUDE_SPRITE_H 56

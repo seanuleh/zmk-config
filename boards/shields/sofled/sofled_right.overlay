@@ -24,3 +24,14 @@
 &right_encoder {
     status = "okay";
 };
+
+/* nice!view's default VCOM toggle interval is 33ms (~30Hz) which sits at the
+ * edge of human flicker-fusion and shows as visible pulsing. Dropping it to
+ * 22ms (~45Hz) pushes the toggle above the perceptible threshold. Addressed
+ * by SPI controller path because the `nice_view` label is processed in a
+ * different overlay file than this one. */
+&spi0 {
+    ls0xx@0 {
+        serial-vcom-interval = <16>;
+    };
+};

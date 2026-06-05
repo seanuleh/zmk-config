@@ -135,10 +135,21 @@ static enum dude_state classify(int64_t now_ms) {
 
 /* ----- LVGL update ----- */
 
+static const lv_image_dsc_t *last_frame;
+
 static void apply_frame(struct dude_widget *w, enum dude_state s) {
     if (!w || !w->sprite) return;
-    lv_image_set_src(w->sprite, frame_for_state(s, walk_phase));
-    lv_label_set_text(w->caption, label_for_state(s));
+    const lv_image_dsc_t *frame = frame_for_state(s, walk_phase);
+    /* Only call lv_image_set_src when the frame actually changes.
+     * Otherwise we trigger 8 redraws/sec of identical content, which the
+     * Sharp Memory LCD shows as visible flicker. */
+    if (frame != last_frame) {
+        lv_image_set_src(w->sprite, frame);
+        last_frame = frame;
+    }
+    if (w->caption) {
+        lv_label_set_text(w->caption, label_for_state(s));
+    }
 }
 
 /* ----- periodic tick ----- */
@@ -147,7 +158,9 @@ static void dude_tick_handler(struct k_work *work);
 static K_WORK_DELAYABLE_DEFINE(dude_tick_work, dude_tick_handler);
 
 static void schedule_tick(void) {
-    k_work_schedule(&dude_tick_work, K_MSEC(120));
+    /* 250ms feels animated enough for the walk cycle without thrashing
+     * the Sharp LCD (each frame swap is a visible refresh). */
+    k_work_schedule(&dude_tick_work, K_MSEC(250));
 }
 
 static void dude_tick_handler(struct k_work *work) {
@@ -210,32 +223,29 @@ ZMK_SUBSCRIPTION(dude_batt, zmk_battery_state_changed);
 int dude_widget_init(struct dude_widget *w, lv_obj_t *parent) {
     the_widget = w;
 
-    /* Container fills its allotted area in the screen */
-    w->obj = lv_obj_create(parent);
-    lv_obj_remove_style_all(w->obj);
-    lv_obj_set_size(w->obj, 68, 130);
-    lv_obj_set_style_bg_color(w->obj, lv_color_black(), LV_PART_MAIN);
+    /* Physical mount is vertical. Native firmware coords are landscape
+     * 160x68; we lay out along the long axis so X=0 maps to the user's
+     * "top". The sprite data is pre-rotated 90deg CW in the codegen so
+     * the dude renders upright in the user's view. */
+    w->obj = parent;
+    w->floor_obj = NULL;
 
-    /* Sprite */
-    w->sprite = lv_image_create(w->obj);
+    w->sprite = lv_image_create(parent);
     lv_image_set_src(w->sprite, &dude_idle);
-    lv_obj_set_style_image_recolor(w->sprite, lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_image_recolor_opa(w->sprite, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_align(w->sprite, LV_ALIGN_CENTER, 0, -10);
+    /* Kill the mono theme's container chrome (bg + border) which paints
+     * a pulsing opaque box around the sprite. Keep the default layout
+     * styles intact so the widget auto-sizes to the image. */
+    lv_obj_set_style_bg_opa(w->sprite, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_opa(w->sprite, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(w->sprite, 0, 0);
+    lv_obj_set_style_pad_all(w->sprite, 0, 0);
+    /* firmware-RIGHT maps to user-TOP on this mount */
+    lv_obj_align(w->sprite, LV_ALIGN_RIGHT_MID, -8, 0);
 
-    /* Dotted floor — simple short line of style-bordered objects */
-    w->floor_obj = lv_obj_create(w->obj);
-    lv_obj_remove_style_all(w->floor_obj);
-    lv_obj_set_size(w->floor_obj, 60, 1);
-    lv_obj_set_style_bg_color(w->floor_obj, lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(w->floor_obj, LV_OPA_50, LV_PART_MAIN);
-    lv_obj_align(w->floor_obj, LV_ALIGN_CENTER, 0, 22);
-
-    /* Caption */
-    w->caption = lv_label_create(w->obj);
-    lv_label_set_text(w->caption, "idle");
-    lv_obj_set_style_text_color(w->caption, lv_color_white(), LV_PART_MAIN);
-    lv_obj_align(w->caption, LV_ALIGN_BOTTOM_MID, 0, -2);
+    /* Caption omitted for now — text labels need runtime rotation
+     * (lv_obj_set_style_transform_rotation) which I'll wire as polish.
+     * The sprite's expression alone telegraphs the current state. */
+    w->caption = NULL;
 
     schedule_tick();
     return 0;

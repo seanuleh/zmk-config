@@ -89,27 +89,23 @@ ZMK_SUBSCRIPTION(wpm_graph_key, zmk_position_state_changed);
 int wpm_graph_widget_init(struct wpm_graph_widget *w, lv_obj_t *parent) {
     the_widget = w;
 
+    /* Container — landscape 160x68 native */
     w->obj = lv_obj_create(parent);
     lv_obj_remove_style_all(w->obj);
-    lv_obj_set_size(w->obj, 68, 160);
-    lv_obj_set_style_bg_color(w->obj, lv_color_black(), LV_PART_MAIN);
+    lv_obj_set_size(w->obj, 160, 68);
 
-    /* Header (placeholder — layer name will plug in once forwarding lands) */
+    /* Header top-left */
     w->header = lv_label_create(w->obj);
     lv_label_set_text(w->header, "wpm");
-    lv_obj_set_style_text_color(w->header, lv_color_white(), LV_PART_MAIN);
     lv_obj_align(w->header, LV_ALIGN_TOP_LEFT, 2, 2);
 
-    /* Chart */
+    /* Chart fills the middle band */
     w->chart = lv_chart_create(w->obj);
-    lv_obj_set_size(w->chart, 60, 90);
-    lv_obj_align(w->chart, LV_ALIGN_TOP_MID, 0, 16);
+    lv_obj_set_size(w->chart, 100, 44);
+    lv_obj_align(w->chart, LV_ALIGN_TOP_LEFT, 30, 16);
     lv_chart_set_type(w->chart, LV_CHART_TYPE_BAR);
     lv_chart_set_range(w->chart, LV_CHART_AXIS_PRIMARY_Y, 0, WPM_MAX);
     lv_chart_set_point_count(w->chart, CHART_POINTS);
-    lv_obj_set_style_bg_color(w->chart, lv_color_black(), LV_PART_MAIN);
-    lv_obj_set_style_border_color(w->chart, lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_border_width(w->chart, 1, LV_PART_MAIN);
     lv_obj_set_style_pad_all(w->chart, 1, LV_PART_MAIN);
     lv_chart_set_div_line_count(w->chart, 0, 0);
     w->series = lv_chart_add_series(w->chart, lv_color_white(),
@@ -120,19 +116,16 @@ int wpm_graph_widget_init(struct wpm_graph_widget *w, lv_obj_t *parent) {
         lv_chart_set_next_value(w->chart, w->series, 0);
     }
 
-    /* Footer stats */
+    /* Stats stack on the right */
     w->now_label  = lv_label_create(w->obj);
     w->avg_label  = lv_label_create(w->obj);
     w->peak_label = lv_label_create(w->obj);
-    lv_label_set_text(w->now_label,  "now  0");
-    lv_label_set_text(w->avg_label,  "avg  0");
-    lv_label_set_text(w->peak_label, "peak 0");
-    lv_obj_set_style_text_color(w->now_label,  lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_text_color(w->avg_label,  lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_text_color(w->peak_label, lv_color_white(), LV_PART_MAIN);
-    lv_obj_align(w->now_label,  LV_ALIGN_TOP_LEFT, 2, 116);
-    lv_obj_align(w->avg_label,  LV_ALIGN_TOP_LEFT, 2, 130);
-    lv_obj_align(w->peak_label, LV_ALIGN_TOP_LEFT, 2, 144);
+    lv_label_set_text(w->now_label,  "now 0");
+    lv_label_set_text(w->avg_label,  "avg 0");
+    lv_label_set_text(w->peak_label, "pk 0");
+    lv_obj_align(w->now_label,  LV_ALIGN_TOP_RIGHT, -2, 16);
+    lv_obj_align(w->avg_label,  LV_ALIGN_TOP_RIGHT, -2, 32);
+    lv_obj_align(w->peak_label, LV_ALIGN_TOP_RIGHT, -2, 48);
 
     k_work_schedule(&wpm_graph_work, K_SECONDS(1));
     return 0;
