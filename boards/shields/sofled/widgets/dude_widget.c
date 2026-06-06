@@ -28,8 +28,8 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 /* ----- activity tracking ----- */
 
 #define KEY_RING_SIZE 32
-#define WPM_WINDOW_MS 5000   /* count keys in last 5s */
-#define WPM_MULTIPLIER 12    /* keys/5s -> ~ keys/min / 5 chars-per-word */
+#define WPM_WINDOW_MS 2000   /* count keys in last 2s — snappy idle return */
+#define WPM_MULTIPLIER 6     /* keys/2s * 30 = chars/min; /5 chars/word = *6 → real WPM */
 
 static int64_t key_times_ms[KEY_RING_SIZE];
 static uint8_t key_ring_head;
@@ -74,7 +74,7 @@ static const lv_image_dsc_t *frame_for_state(enum dude_state s, uint8_t phase) {
     case DS_IDLE:    return blink_now ? &dude_blink : &dude_idle;
     case DS_WORKING: return phase ? &dude_working_b : &dude_working_a;
     case DS_COOKING: return phase ? &dude_cooking_b : &dude_cooking_a;
-    case DS_HYPER:   return &dude_hyper;
+    case DS_HYPER:   return phase ? &dude_hyper_b : &dude_hyper_a;
     case DS_SLEEP:   return &dude_sleep;
     case DS_MASH:    return &dude_mash;
     case DS_DROOP:   return &dude_droop;
@@ -130,8 +130,8 @@ static enum dude_state classify(int64_t now_ms) {
     }
     uint8_t wpm = window_wpm_estimate(now_ms);
     if (wpm == 0)       return DS_IDLE;
-    if (wpm < 40)       return DS_WORKING;
-    if (wpm < 80)       return DS_COOKING;
+    if (wpm < 60)       return DS_WORKING;
+    if (wpm < 100)      return DS_COOKING;
     return DS_HYPER;
 }
 
@@ -153,7 +153,14 @@ static void apply_frame(struct dude_widget *w, enum dude_state s) {
         lv_label_set_text(w->caption, label_for_state(s));
     }
     if (w->batt_label) {
-        lv_label_set_text_fmt(w->batt_label, "%u%%", batt_pct);
+        /* Always 3 chars wide so LEFT-align doesn't shift between states:
+         *   100 → "100" (no %)
+         *   0..99 → " 5%" / "92%" (leading-space-padded) */
+        if (batt_pct >= 100) {
+            lv_label_set_text(w->batt_label, "100");
+        } else {
+            lv_label_set_text_fmt(w->batt_label, "%2u%%", batt_pct);
+        }
     }
     if (w->conn_label) {
         bool conn = zmk_split_bt_peripheral_is_connected();
