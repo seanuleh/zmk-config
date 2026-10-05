@@ -8,9 +8,9 @@ This `george` branch is a stripped-down build of the `sofled` config for a simpl
 
 ## Firmware
 GitHub Actions builds on every push. Download the `firmware` artifact from the latest run:
-* `sofled_left-nice_nano-zmk.uf2`: left half
-* `sofled_right-nice_nano-zmk.uf2`: right half
-* `settings_reset-nice_nano-zmk.uf2`: clears pairing data
+* `sofled_left-nice_nano_nrf52840_zmk-zmk.uf2`: left half
+* `sofled_right-nice_nano_nrf52840_zmk-zmk.uf2`: right half
+* `settings_reset-nice_nano_nrf52840_zmk-zmk.uf2`: clears pairing data
 
 ## Flashing
 1. Unplug the TRRS cable.
