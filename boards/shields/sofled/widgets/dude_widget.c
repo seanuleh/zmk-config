@@ -19,9 +19,20 @@
 #include <zmk/event_manager.h>
 #include <zmk/events/position_state_changed.h>
 #include <zmk/events/battery_state_changed.h>
-#include <zmk/events/split_peripheral_status_changed.h>
 #include <zmk/battery.h>
+
+/* Left half is a peripheral when paired with the dongle, but the central
+ * (talks to the host directly) in the dongle-less build. The conn icon
+ * tracks whichever link this half actually owns. */
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+#include <zmk/ble.h>
+#include <zmk/usb.h>
+#include <zmk/events/ble_active_profile_changed.h>
+#include <zmk/events/usb_conn_state_changed.h>
+#else
+#include <zmk/events/split_peripheral_status_changed.h>
 #include <zmk/split/bluetooth/peripheral.h>
+#endif
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
@@ -135,6 +146,19 @@ static enum dude_state classify(int64_t now_ms) {
     return DS_HYPER;
 }
 
+static bool link_connected(void) {
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+#if IS_ENABLED(CONFIG_ZMK_USB)
+    if (zmk_usb_is_hid_ready()) {
+        return true;
+    }
+#endif
+    return zmk_ble_active_profile_is_connected();
+#else
+    return zmk_split_bt_peripheral_is_connected();
+#endif
+}
+
 /* ----- LVGL update ----- */
 
 static const lv_image_dsc_t *last_frame;
@@ -163,7 +187,7 @@ static void apply_frame(struct dude_widget *w, enum dude_state s) {
         }
     }
     if (w->conn_label) {
-        bool conn = zmk_split_bt_peripheral_is_connected();
+        bool conn = link_connected();
         /* When connected, show WIFI + tick. When disconnected, just the
          * WIFI symbol — drops the trailing glyph entirely so the wifi
          * icon's position stays fixed regardless of state. */
@@ -234,7 +258,14 @@ static int dude_conn_listener(const zmk_event_t *eh) {
     return 0;
 }
 ZMK_LISTENER(dude_conn, dude_conn_listener);
+#if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+ZMK_SUBSCRIPTION(dude_conn, zmk_ble_active_profile_changed);
+#if IS_ENABLED(CONFIG_ZMK_USB)
+ZMK_SUBSCRIPTION(dude_conn, zmk_usb_conn_state_changed);
+#endif
+#else
 ZMK_SUBSCRIPTION(dude_conn, zmk_split_peripheral_status_changed);
+#endif
 
 #if IS_ENABLED(CONFIG_ZMK_BATTERY_REPORTING)
 static int dude_batt_listener(const zmk_event_t *eh) {

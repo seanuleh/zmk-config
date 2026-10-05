@@ -1,12 +1,11 @@
 ---
+# George's Sofle: no dongle, no displays, no LEDs.
+# Left half is the central and talks to the host directly.
 include:
   - board: nice_nano/nrf52840/zmk
-    shield: sofled_left nice_view_adapter nice_view
+    shield: sofled_left
+    cmake-args: -DCONFIG_ZMK_SPLIT_ROLE_CENTRAL=y
   - board: nice_nano/nrf52840/zmk
-    shield: sofled_right nice_view_adapter nice_view
-  - board: nrfmicro/nrf52840/zmk
-    shield: sofled_dongle
-  - board: nrfmicro/nrf52840/zmk
-    shield: settings_reset
+    shield: sofled_right
   - board: nice_nano/nrf52840/zmk
     shield: settings_reset

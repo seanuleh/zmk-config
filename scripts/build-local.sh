@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 # Build all sofled firmware locally via the ZMK build container.
-# Run from the repo root. Outputs UF2s under build/{left,right,dongle}/zephyr/.
+# Run from the repo root. Outputs UF2s under build/{left,right}/zephyr/.
 #
 # Usage:
-#   scripts/build-local.sh            # build all three
+#   scripts/build-local.sh            # build both halves
 #   scripts/build-local.sh left       # build only left
 #   scripts/build-local.sh right
-#   scripts/build-local.sh dongle
 #
 # First run does `west update` (slow, downloads modules). Subsequent runs
 # reuse the workspace and finish in ~15-30s each.
@@ -26,22 +25,23 @@ if [ ! -d "$REPO/.west" ]; then
 fi
 
 build_target() {
-  local name="$1" board="$2" shield="$3"
+  local name="$1" board="$2" shield="$3" extra="${4:-}"
   mkdir -p "$REPO/build/$name"
   echo "=== building $name ==="
-  run_in_container "source /zmk-config/zephyr/zephyr-env.sh && west zephyr-export 2>/dev/null && west build -s zmk/app -d build/$name -b \"$board\" -- -DSHIELD=\"$shield\" -DZMK_CONFIG=/zmk-config/config -DBOARD_ROOT=/zmk-config"
+  run_in_container "source /zmk-config/zephyr/zephyr-env.sh && west zephyr-export 2>/dev/null && west build -s zmk/app -d build/$name -b \"$board\" -- -DSHIELD=\"$shield\" -DZMK_CONFIG=/zmk-config/config -DBOARD_ROOT=/zmk-config $extra"
   echo "→ build/$name/zephyr/zmk.uf2"
 }
 
 target="${1:-all}"
+# George's board: no dongle, no displays, no LEDs. Left is central.
+LEFT=(left "nice_nano/nrf52840/zmk" "sofled_left" "-DCONFIG_ZMK_SPLIT_ROLE_CENTRAL=y")
+RIGHT=(right "nice_nano/nrf52840/zmk" "sofled_right")
 case "$target" in
-  left)   build_target left   "nice_nano/nrf52840/zmk" "sofled_left nice_view_adapter nice_view" ;;
-  right)  build_target right  "nice_nano/nrf52840/zmk" "sofled_right nice_view_adapter nice_view" ;;
-  dongle) build_target dongle "nrfmicro/nrf52840/zmk" "sofled_dongle" ;;
+  left)  build_target "${LEFT[@]}" ;;
+  right) build_target "${RIGHT[@]}" ;;
   all)
-    build_target left   "nice_nano/nrf52840/zmk" "sofled_left nice_view_adapter nice_view"
-    build_target right  "nice_nano/nrf52840/zmk" "sofled_right nice_view_adapter nice_view"
-    build_target dongle "nrfmicro/nrf52840/zmk" "sofled_dongle"
+    build_target "${LEFT[@]}"
+    build_target "${RIGHT[@]}"
     ;;
-  *) echo "usage: $0 [left|right|dongle|all]" >&2; exit 1 ;;
+  *) echo "usage: $0 [left|right|all]" >&2; exit 1 ;;
 esac

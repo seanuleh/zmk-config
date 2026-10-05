@@ -14,6 +14,13 @@ config ZMK_SPLIT
 
 endif
 
+if SHIELD_SOFLED_LEFT
+
+config ZMK_KEYBOARD_NAME
+    default "Sofle"
+
+endif
+
 if SHIELD_SOFLED_LEFT || SHIELD_SOFLED_RIGHT || SHIELD_SOFLED_DONGLE
 
  config ZMK_SPLIT
