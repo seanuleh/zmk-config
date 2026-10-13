@@ -8,3 +8,8 @@ Dongle: [nrfMicro](https://github.com/joric/nrfmicro) (v1.3) with OLED Dispaly
 
 # Layout
 ![layout](sofled.svg)
+
+# Keycaps
+KLP Lamé (choc) set from the [Yuzu playground](https://yuzukeycaps.com/playground). Import [`keycaps/Sofle60.json`](keycaps/Sofle60.json) to edit.
+
+![keycaps](keycaps/Sofle60.png)
