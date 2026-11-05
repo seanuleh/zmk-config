@@ -16,6 +16,7 @@
 #include <zephyr/logging/log.h>
 #include <lvgl.h>
 
+#include <zmk/display.h>
 #include <zmk/event_manager.h>
 #include <zmk/events/position_state_changed.h>
 #include <zmk/events/battery_state_changed.h>
@@ -138,6 +139,12 @@ static enum dude_state classify(int64_t now_ms) {
 /* ----- LVGL update ----- */
 
 static const lv_image_dsc_t *last_frame;
+/* Last values pushed to LVGL. lv_label_set_text frees/mallocs and
+ * invalidates (re-rendering the rotated label) even when the text is
+ * identical, so only touch labels when the value changes. */
+static const char *shown_caption;
+static int shown_batt = -1;
+static int shown_conn = -1;
 
 static void apply_frame(struct dude_widget *w, enum dude_state s) {
     if (!w || !w->sprite) return;
@@ -149,10 +156,13 @@ static void apply_frame(struct dude_widget *w, enum dude_state s) {
         lv_image_set_src(w->sprite, frame);
         last_frame = frame;
     }
-    if (w->caption) {
-        lv_label_set_text(w->caption, label_for_state(s));
+    const char *caption = label_for_state(s);
+    if (w->caption && caption != shown_caption) {
+        shown_caption = caption;
+        lv_label_set_text(w->caption, caption);
     }
-    if (w->batt_label) {
+    if (w->batt_label && batt_pct != shown_batt) {
+        shown_batt = batt_pct;
         /* Always 3 chars wide so LEFT-align doesn't shift between states:
          *   100 → "100" (no %)
          *   0..99 → " 5%" / "92%" (leading-space-padded) */
@@ -162,8 +172,9 @@ static void apply_frame(struct dude_widget *w, enum dude_state s) {
             lv_label_set_text_fmt(w->batt_label, "%2u%%", batt_pct);
         }
     }
-    if (w->conn_label) {
-        bool conn = zmk_split_bt_peripheral_is_connected();
+    int conn = zmk_split_bt_peripheral_is_connected() ? 1 : 0;
+    if (w->conn_label && conn != shown_conn) {
+        shown_conn = conn;
         /* When connected, show WIFI + tick. When disconnected, just the
          * WIFI symbol — drops the trailing glyph entirely so the wifi
          * icon's position stays fixed regardless of state. */
@@ -178,10 +189,18 @@ static void apply_frame(struct dude_widget *w, enum dude_state s) {
 static void dude_tick_handler(struct k_work *work);
 static K_WORK_DELAYABLE_DEFINE(dude_tick_work, dude_tick_handler);
 
+/* Runs on ZMK's display work queue (the thread that calls lv_task_handler).
+ * LVGL is not thread-safe, and the system workqueue also carries BT TX —
+ * rendering there delays key notifications to the dongle. */
+static void schedule_tick_in(k_timeout_t delay) {
+    k_work_reschedule_for_queue(zmk_display_work_q(), &dude_tick_work, delay);
+}
+
 static void schedule_tick(void) {
     /* 120ms — snappy state changes; redraws are still skipped when the
-     * actual frame doesn't change so idle is quiet. */
-    k_work_schedule(&dude_tick_work, K_MSEC(120));
+     * actual frame doesn't change. Asleep, nothing animates, so poll
+     * slowly; a keypress pulls the next tick forward. */
+    schedule_tick_in(cur_state == DS_SLEEP ? K_SECONDS(1) : K_MSEC(120));
 }
 
 static void dude_tick_handler(struct k_work *work) {
@@ -222,15 +241,19 @@ static int dude_key_listener(const zmk_event_t *eh) {
     if (burst_detected(now)) {
         mash_until_ms = now + MASH_HOLD_MS;
     }
+    if (cur_state == DS_SLEEP) {
+        schedule_tick_in(K_NO_WAIT);   /* wake the dude promptly */
+    }
     return 0;
 }
 ZMK_LISTENER(dude_key, dude_key_listener);
 ZMK_SUBSCRIPTION(dude_key, zmk_position_state_changed);
 
 static int dude_conn_listener(const zmk_event_t *eh) {
-    /* Force a redraw next tick by clearing last_frame so apply_frame
-     * re-emits even if the dude state hasn't changed. */
-    last_frame = NULL;
+    /* Raised from BT connect/disconnect callbacks — never touch LVGL here.
+     * Pull the next tick forward; it refreshes the conn label on the
+     * display thread. */
+    schedule_tick_in(K_NO_WAIT);
     return 0;
 }
 ZMK_LISTENER(dude_conn, dude_conn_listener);

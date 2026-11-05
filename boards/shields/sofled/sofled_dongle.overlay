@@ -6,15 +6,24 @@
 
 #include "sofled.dtsi"
 
+/* The dongle has no switches. The shared sofled.dtsi matrix would drive
+ * pro_micro 19 (P0.29) — which is also I2C SDA below — and fight the OLED
+ * bus. Use a mock kscan instead and disable the matrix. */
+/ {
+    chosen {
+        zmk,kscan = &mock_kscan;
+    };
+
+    mock_kscan: kscan_mock {
+        compatible = "zmk,kscan-mock";
+        columns = <0>;
+        rows = <0>;
+        events = <0>;
+    };
+};
+
 &kscan0 {
-    col-gpios
-        = <&pro_micro 19 GPIO_ACTIVE_HIGH>
-        , <&pro_micro 18 GPIO_ACTIVE_HIGH>
-        , <&pro_micro 15 GPIO_ACTIVE_HIGH>
-        , <&pro_micro 14 GPIO_ACTIVE_HIGH>
-        , <&pro_micro 16 GPIO_ACTIVE_HIGH>
-        , <&pro_micro 10 GPIO_ACTIVE_HIGH>
-        ;
+    status = "disabled";
 };
 
 &pinctrl {
@@ -39,4 +48,6 @@
     pinctrl-0 = <&i2c0_default>;
     pinctrl-1 = <&i2c0_sleep>;
     pinctrl-names = "default", "sleep";
+    /* 400 kHz: default 100 kHz makes a full SSD1306 frame ~45 ms. */
+    clock-frequency = <I2C_BITRATE_FAST>;
 };

@@ -17,7 +17,7 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 IMG="zmkfirmware/zmk-build-arm:stable"
 
 run_in_container() {
-  docker run --rm -v "$REPO:/zmk-config" -w /zmk-config "$IMG" bash -c "$1"
+  docker run --rm -v "$REPO:/zmk-config" -w /zmk-config "$IMG" bash -c "git config --global --add safe.directory '*'; $1"
 }
 
 if [ ! -d "$REPO/.west" ]; then

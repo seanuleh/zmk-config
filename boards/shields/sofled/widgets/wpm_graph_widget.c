@@ -21,6 +21,7 @@
 #include <zephyr/logging/log.h>
 #include <lvgl.h>
 
+#include <zmk/display.h>
 #include <zmk/event_manager.h>
 #include <zmk/events/position_state_changed.h>
 #include <zmk/events/battery_state_changed.h>
@@ -62,6 +63,13 @@ static uint8_t batt_pct = 100;
 static uint8_t canvas_buf[LV_CANVAS_BUF_SIZE(CANVAS_W, CANVAS_H, CANVAS_BPP, CANVAS_STRIDE)];
 
 static struct wpm_graph_widget *the_widget;
+
+/* Last values pushed to LVGL. lv_label_set_text frees/mallocs and
+ * invalidates even when the string is identical, so only touch a label
+ * when its value actually changes. -1 = never drawn. */
+static int shown_num[3] = {-1, -1, -1};
+static int shown_batt = -1;
+static int shown_conn = -1;
 
 static uint8_t compute_wpm(int64_t now_ms) {
     int n = 0;
@@ -119,8 +127,32 @@ static void redraw_canvas(struct wpm_graph_widget *w) {
     lv_canvas_finish_layer(w->canvas, &layer);
 }
 
+/* All LVGL work runs on ZMK's display work queue — the same thread that
+ * calls lv_task_handler. LVGL is not thread-safe, and running the render on
+ * the system workqueue also blocks BT TX (Zephyr's tx_work lives there),
+ * which delays key notifications to the dongle. */
 static void wpm_graph_tick(struct k_work *work);
 static K_WORK_DELAYABLE_DEFINE(wpm_graph_work, wpm_graph_tick);
+
+static void schedule_tick(k_timeout_t delay) {
+    k_work_reschedule_for_queue(zmk_display_work_q(), &wpm_graph_work, delay);
+}
+
+static bool ring_all_zero(void) {
+    for (int i = 0; i < N_SAMPLES; i++) {
+        if (wpm_ring[i]) return false;
+    }
+    return true;
+}
+
+static void update_conn_label(struct wpm_graph_widget *w) {
+    if (!w->conn_label) return;
+    int conn = zmk_split_bt_peripheral_is_connected() ? 1 : 0;
+    if (conn == shown_conn) return;
+    shown_conn = conn;
+    lv_label_set_text(w->conn_label,
+                      conn ? LV_SYMBOL_WIFI " " LV_SYMBOL_OK : LV_SYMBOL_WIFI);
+}
 
 static void wpm_graph_tick(struct k_work *work) {
     int64_t now = k_uptime_get();
@@ -131,32 +163,36 @@ static void wpm_graph_tick(struct k_work *work) {
     if (wpm_avg_count < 0xFFFE) wpm_avg_count++;
     uint8_t avg = (uint8_t)(wpm_avg_count ? (wpm_avg_accum / wpm_avg_count) : 0);
 
+    /* An all-zero ring shifting in another zero draws the same picture —
+     * skip the canvas render entirely while idle. */
+    bool was_flat = ring_all_zero();
     wpm_ring[ring_head] = wpm;
     ring_head = (ring_head + 1) % N_SAMPLES;
+    bool graph_changed = !(was_flat && wpm == 0);
 
-    if (the_widget) {
-        redraw_canvas(the_widget);
-        if (the_widget->footer_num[0])
-            lv_label_set_text_fmt(the_widget->footer_num[0], "%3u", wpm);
-        if (the_widget->footer_num[1])
-            lv_label_set_text_fmt(the_widget->footer_num[1], "%3u", avg);
-        if (the_widget->footer_num[2])
-            lv_label_set_text_fmt(the_widget->footer_num[2], "%3u", wpm_peak);
-        if (the_widget->batt_label) {
+    struct wpm_graph_widget *w = the_widget;
+    if (w) {
+        if (graph_changed) redraw_canvas(w);
+
+        const int nums[3] = {wpm, avg, wpm_peak};
+        for (int i = 0; i < 3; i++) {
+            if (w->footer_num[i] && nums[i] != shown_num[i]) {
+                shown_num[i] = nums[i];
+                lv_label_set_text_fmt(w->footer_num[i], "%3u", nums[i]);
+            }
+        }
+        if (w->batt_label && batt_pct != shown_batt) {
+            shown_batt = batt_pct;
             /* Always 3 chars: "100" or " 5%"/"92%". See dude_widget for why. */
             if (batt_pct >= 100)
-                lv_label_set_text(the_widget->batt_label, "100");
+                lv_label_set_text(w->batt_label, "100");
             else
-                lv_label_set_text_fmt(the_widget->batt_label, "%2u%%", batt_pct);
+                lv_label_set_text_fmt(w->batt_label, "%2u%%", batt_pct);
         }
-        if (the_widget->conn_label) {
-            bool conn = zmk_split_bt_peripheral_is_connected();
-            lv_label_set_text(the_widget->conn_label,
-                              conn ? LV_SYMBOL_WIFI " " LV_SYMBOL_OK : LV_SYMBOL_WIFI);
-        }
+        update_conn_label(w);
     }
 
-    k_work_schedule(&wpm_graph_work, K_SECONDS(1));
+    schedule_tick(K_SECONDS(1));
 }
 
 static int wpm_graph_key_listener(const zmk_event_t *eh) {
@@ -170,11 +206,10 @@ ZMK_LISTENER(wpm_graph_key, wpm_graph_key_listener);
 ZMK_SUBSCRIPTION(wpm_graph_key, zmk_position_state_changed);
 
 static int wpm_graph_conn_listener(const zmk_event_t *eh) {
-    if (the_widget && the_widget->conn_label) {
-        bool conn = zmk_split_bt_peripheral_is_connected();
-        lv_label_set_text(the_widget->conn_label,
-                          conn ? LV_SYMBOL_WIFI " " LV_SYMBOL_OK : LV_SYMBOL_WIFI);
-    }
+    /* Raised from the BT connected/disconnected callbacks — never touch
+     * LVGL here. Pull the next tick forward; it refreshes the label on
+     * the display thread. */
+    schedule_tick(K_NO_WAIT);
     return 0;
 }
 ZMK_LISTENER(wpm_graph_conn, wpm_graph_conn_listener);
@@ -264,6 +299,6 @@ int wpm_graph_widget_init(struct wpm_graph_widget *w, lv_obj_t *parent) {
         lv_obj_set_style_text_font(w->footer_num[i], &lv_font_unscii_8, 0);
     }
 
-    k_work_schedule(&wpm_graph_work, K_SECONDS(1));
+    schedule_tick(K_SECONDS(1));
     return 0;
 }
