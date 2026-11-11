@@ -32,6 +32,13 @@ config SOFLED_CUSTOM_STATUS_SCREEN
     depends on ZMK_DISPLAY_STATUS_SCREEN_CUSTOM
     default y
 
+config SOFLED_LINK_WIDGET
+    bool "Dongle split-link panel (RSSI, drops, last drop reason)"
+    depends on SHIELD_SOFLED_DONGLE && SOFLED_CUSTOM_STATUS_SCREEN
+    default y
+    select ZMK_LOW_PRIORITY_WORK_QUEUE
+    select BT_CTLR_CONN_RSSI
+
 endif # ZMK_DISPLAY
 
 if LVGL

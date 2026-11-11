@@ -48,6 +48,16 @@ Flash **all three** (the keymap is compiled into each, and each side's config ch
 
 ## If problems remain
 
+- **Round 2 (2026-11-11, built, not flashed):** dropouts came back. `CONFIG_ZMK_BLE_EXPERIMENTAL_CONN=y`
+  on all three (1M PHY instead of 2M, better range). Dongle battery reporting turned off, because its
+  floating BAT pin read a meaningless 0%. TX power was already +8 dBm everywhere.
+  Either half drops, both on USB, so the dongle and its RF surroundings are the main suspect.
+- **Dongle link panel** (`widgets/link_widget.c`, replaces the battery widget). The right side of the OLED shows:
+  `L -58  0` / `R -71  2` = side, RSSI in dBm (`--` while down), drops since boot; then
+  `R 08 12m` = last drop's side, HCI reason (hex) and how long ago. A half shows `?` until you
+  press a key on it after the dongle boots. RSSI: above -70 is fine, -70 to -80 is marginal,
+  below -85 drops. Reason `08` = supervision timeout (RF loss). `13` = the half closed the link.
+
 - **Right half still drops out:** build it with `CONFIG_ZMK_DISPLAY=n` in `sofled_right.conf`.
   If that fixes it, the display path is still to blame. If it doesn't, suspect RF: try
   the dongle on a USB extension near the keyboard, away from USB 3 ports.
