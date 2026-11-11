@@ -33,7 +33,7 @@ board_w      = 18.0;
 board_t      = 1.0;
 top_clear    = 6.8;   // tallest top-side part (reset button) + margin
 button_h     = 6.0;   // reset button height above the PCB (measured)
-button_from_tip = 9.0; // button centre distance from the USB-C tip (measured)
+button_from_tip = 11.0; // button centre distance from the USB-C tip (9 measured; print showed it 2 mm too close to the USB end)
 usb_over     = 2.0;   // USB-C overhang past the PCB end (measured 1-2)
 usb_h        = 3.2;   // USB-C receptacle height above the PCB
 
@@ -46,6 +46,7 @@ glass_off    = 1.5;   // glass distance from the non-pin end of the PCB
 win_l        = 24.0;  // window over the 22.4 x 5.6 active area
 win_h        = 7.5;
 win_dz       = 0.0;   // nudge the window up/down if the active area is off-centre
+win_dx       = -2.0;  // nudge along X (- = left when facing the screen); print showed it 2 mm right
 wire_gap     = 2.0;   // OLED back -> nRFMicro back (wires, solder joints)
 
 usb_end_right = true; // USB faces +X; false mirrors the whole case
@@ -89,7 +90,7 @@ yn    = yf + oled_t + wire_gap; // nRFMicro back face
 nx1   = cx1 - fit - usb_over;   // nRFMicro PCB USB end (USB tip sits at cx1 - fit)
 nx0   = nx1 - board_l;          // nRFMicro antenna end
 ox1   = cx0 + fit + oled_l;     // OLED non-pin end (pins at the antenna end)
-win_cx = ox1 - glass_off - glass_l/2;
+win_cx = ox1 - glass_off - glass_l/2 + win_dx;
 
 module xmirror() { if (usb_end_right) children(); else translate([L,0,0]) mirror([1,0,0]) children(); }
 
@@ -121,8 +122,9 @@ module clip() {
       // USB-C opening, sized for a typical plug overmold
       translate([cx1 - 1, yn + board_t + usb_h/2 - 3.75, zc - 6.25]) cube([usb_wall + 2, 7.5, 12.5]);
       // snap grooves (top + bottom inner walls) for the lid skirt
+      // (centred on the lid nubs, which sit at yback-1.5 .. yback-0.7)
       for (z = [zb - snap - 0.1, zt - 0.01])
-        translate([L/2 - 8, yback - lid_clear - 0.6 - 1.0, z]) cube([16, 1.0, snap + 0.11]);
+        translate([L/2 - 8, yback - 0.6 - 1.0, z]) cube([16, 1.0, snap + 0.11]);
     }
     // corner posts: hold the OLED against the window and space the nRFMicro off it
     for (x = [nx0, nx1 - 1.2], z = [zb, zt - 2])
@@ -136,7 +138,8 @@ module lid() { // modelled lying flat: outside face on z = 0, skirt + nubs up
   zl = function(z) z - (zb - wall);
   bx = cx1 - fit - button_from_tip;
   by = zl(zc);
-  hgt = cav_h + wall + plate;
+  hgt = cav_h + wall - lid_clear; // covers the box bottom up to the plate underside; the plate runs on
+                                 // past the back of the box, so the lid tucks under it, not over it
   xmirror() {
     difference() {
       cube([L, hgt, lid_t]);
