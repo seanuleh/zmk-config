@@ -10,3 +10,8 @@ include:
     shield: settings_reset
   - board: nice_nano/nrf52840/zmk
     shield: settings_reset
+  # Dongle with USB serial logging (debug only; read with a serial terminal)
+  - board: nrfmicro/nrf52840/zmk
+    shield: sofled_dongle
+    snippet: zmk-usb-logging
+    artifact-name: sofled_dongle-usb-logging
