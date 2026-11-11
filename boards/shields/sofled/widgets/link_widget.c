@@ -1,12 +1,11 @@
 /*
- * Dongle split-link panel: per-half RSSI, drop count, last drop reason.
+ * Dongle split-link panel: per-half RSSI and drop count.
  *
- *   L -58  0      <- side, RSSI dBm (or "--" when down), drops since boot
- *   R -71  2
- *   R 08 12m      <- last drop: side, HCI reason (hex), how long ago
+ *   L -58  0      <- side, RSSI dBm ("ok" if not polled, "--" when down),
+ *   R -71  2         drops since boot
  *
- * Reasons worth knowing: 08 = supervision timeout (RF loss / half died),
- * 13 = half closed the link, 3e = link failed to establish, 22 = LL timeout.
+ * Drop reasons are only logged (08 = supervision timeout, 13 = half closed
+ * the link, 3e = link failed to establish, 22 = LL timeout).
  *
  * Sides are learned from the first key press each half sends (the central
  * only knows peripherals by address), so a half shows "?" until it is used.
@@ -56,10 +55,6 @@ struct link {
 
 static struct k_spinlock lock;
 static struct link links[MAX_LINKS];
-static bool have_drop;
-static char last_drop_side = '?';
-static uint8_t last_drop_reason;
-static int64_t last_drop_ms;
 
 static lv_obj_t *label;
 static char shown[48];
@@ -103,19 +98,6 @@ static bool is_split_link(struct bt_conn *conn) {
 
 /* ---------- display (display work queue only) ---------- */
 
-static void fmt_age(char *buf, size_t len, int64_t ms) {
-    int64_t s = ms / 1000;
-    if (s < 60) {
-        snprintf(buf, len, "%ds", (int)s);
-    } else if (s < 3600) {
-        snprintf(buf, len, "%dm", (int)(s / 60));
-    } else if (s < 100 * 3600) {
-        snprintf(buf, len, "%dh", (int)(s / 3600));
-    } else {
-        snprintf(buf, len, "%dd", (int)(s / 86400));
-    }
-}
-
 static void render(struct k_work *work) {
     if (!label) {
         return;
@@ -127,10 +109,6 @@ static void render(struct k_work *work) {
     k_spinlock_key_t key = k_spin_lock(&lock);
     struct link copy[MAX_LINKS];
     memcpy(copy, links, sizeof(copy));
-    bool drop = have_drop;
-    char dside = last_drop_side;
-    uint8_t dreason = last_drop_reason;
-    int64_t dms = last_drop_ms;
     k_spin_unlock(&lock, key);
 
     /* Left first, then right, then unknown — stable line order. */
@@ -146,7 +124,7 @@ static void render(struct k_work *work) {
             if (l->up && l->rssi_valid) {
                 snprintf(rssi, sizeof(rssi), "%d", l->rssi);
             } else {
-                strcpy(rssi, l->up ? ".." : "--");
+                strcpy(rssi, !l->up ? "--" : IS_ENABLED(CONFIG_SOFLED_LINK_RSSI) ? ".." : "ok");
             }
             n += snprintf(text + n, sizeof(text) - n, "%s%c %3s %2u", lines ? "\n" : "", l->side,
                           rssi, l->drops > 99 ? 99 : l->drops);
@@ -154,13 +132,7 @@ static void render(struct k_work *work) {
         }
     }
     if (lines == 0) {
-        n += snprintf(text + n, sizeof(text) - n, "no halves");
-        lines++;
-    }
-    if (drop) {
-        char age[6];
-        fmt_age(age, sizeof(age), k_uptime_get() - dms);
-        snprintf(text + n, sizeof(text) - n, "\n%c %02x %s", dside, dreason, age);
+        snprintf(text + n, sizeof(text) - n, "no halves");
     }
 
     if (strcmp(text, shown) != 0) {
@@ -173,6 +145,7 @@ static K_WORK_DEFINE(render_work, render);
 
 static void request_render(void) { k_work_submit_to_queue(zmk_display_work_q(), &render_work); }
 
+#if IS_ENABLED(CONFIG_SOFLED_LINK_RSSI)
 /* ---------- RSSI poll (low-priority work queue) ---------- */
 
 struct conn_list {
@@ -182,7 +155,11 @@ struct conn_list {
 
 static void collect_conn(struct bt_conn *conn, void *data) {
     struct conn_list *list = data;
-    if (list->count < MAX_LINKS && is_split_link(conn)) {
+    struct bt_conn_info info;
+    /* Only established links: a pending connection attempt (dst FF:FF..)
+     * would otherwise take one of the two slots and hide a real half. */
+    if (list->count < MAX_LINKS && bt_conn_get_info(conn, &info) == 0 &&
+        info.role == BT_CONN_ROLE_CENTRAL && info.state == BT_CONN_STATE_CONNECTED) {
         list->conns[list->count++] = bt_conn_ref(conn);
     }
 }
@@ -232,12 +209,17 @@ static void poll_handler(struct k_work *work) {
         }
         k_spin_unlock(&lock, key);
 
+
         bt_conn_unref(list.conns[i]);
     }
 
     request_render();
     k_work_reschedule_for_queue(zmk_workqueue_lowprio_work_q(), &poll_work, K_MSEC(POLL_MS));
 }
+
+#else
+static struct k_work_delayable poll_work;
+#endif
 
 /* ---------- connection events (BT context) ---------- */
 
@@ -251,7 +233,11 @@ static void on_connected(struct bt_conn *conn, uint8_t err) {
         l->up = true;
         l->rssi_valid = false;
     }
+    char side = l ? l->side : '-';
     k_spin_unlock(&lock, key);
+    char addr[BT_ADDR_LE_STR_LEN];
+    bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+    LOG_INF("split link %c up: %s%s", side, addr, l ? "" : " (no slot!)");
     request_render();
 }
 
@@ -265,10 +251,6 @@ static void on_disconnected(struct bt_conn *conn, uint8_t reason) {
         l->up = false;
         l->rssi_valid = false;
         l->drops++;
-        have_drop = true;
-        last_drop_side = l->side;
-        last_drop_reason = reason;
-        last_drop_ms = k_uptime_get();
     }
     char side = l ? l->side : '?';
     k_spin_unlock(&lock, key);
@@ -351,6 +333,9 @@ lv_obj_t *link_widget_init(lv_obj_t *parent) {
     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
     lv_label_set_text(label, "");
 
-    k_work_reschedule_for_queue(zmk_workqueue_lowprio_work_q(), &poll_work, K_MSEC(POLL_MS));
+    if (IS_ENABLED(CONFIG_SOFLED_LINK_RSSI)) {
+        k_work_reschedule_for_queue(zmk_workqueue_lowprio_work_q(), &poll_work, K_MSEC(POLL_MS));
+    }
+    request_render();
     return label;
 }

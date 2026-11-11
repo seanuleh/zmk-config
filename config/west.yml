@@ -8,8 +8,10 @@ manifest:
       url-base: https://github.com/seanuleh
   projects:
     - name: zmk
-      remote: zmkfirmware
-      revision: main
+      remote: seanuleh
+      # zmkfirmware/zmk main + split central rescan fix and
+      # ZMK_BLE_HOST_ADVERTISING option (see the branch's commit).
+      revision: sofled-split-fixes
       import: app/west.yml
     - name: zmk-layer-report
       remote: seanuleh
