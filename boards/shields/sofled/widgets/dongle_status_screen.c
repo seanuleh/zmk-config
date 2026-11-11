@@ -27,7 +27,10 @@ lv_obj_t *zmk_display_status_screen(void) {
                                lv_theme_get_font_small(screen), LV_PART_MAIN);
     lv_obj_align(zmk_widget_layer_status_obj(&layer_status_widget), LV_ALIGN_BOTTOM_LEFT, 0, 0);
 
-    lv_obj_align(link_widget_init(screen), LV_ALIGN_TOP_RIGHT, 0, 0);
+    lv_obj_t *link = link_widget_init(screen);
+    if (link) {
+        lv_obj_align(link, LV_ALIGN_TOP_RIGHT, 0, 0);
+    }
 
     return screen;
 }

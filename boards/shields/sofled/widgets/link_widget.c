@@ -343,6 +343,10 @@ ZMK_SUBSCRIPTION(sofled_link_widget, zmk_position_state_changed);
 
 lv_obj_t *link_widget_init(lv_obj_t *parent) {
     label = lv_label_create(parent);
+    if (!label) {
+        LOG_ERR("link widget: LVGL out of memory");
+        return NULL;
+    }
     lv_obj_set_style_text_font(label, &lv_font_unscii_8, LV_PART_MAIN);
     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
     lv_label_set_text(label, "");
