@@ -250,7 +250,12 @@ static void on_disconnected(struct bt_conn *conn, uint8_t reason) {
     if (l && l->up) {
         l->up = false;
         l->rssi_valid = false;
-        l->drops++;
+        /* 0x3e = never established (first packets lost). Routine while the
+         * halves notice a dongle restart; counting it made a clean boot
+         * read as several drops. Only count links that actually dropped. */
+        if (reason != BT_HCI_ERR_CONN_FAIL_TO_ESTAB) {
+            l->drops++;
+        }
     }
     char side = l ? l->side : '?';
     k_spin_unlock(&lock, key);
