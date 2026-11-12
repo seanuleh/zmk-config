@@ -51,6 +51,12 @@ wire_gap     = 2.0;   // OLED back -> nRFMicro back (wires, solder joints)
 
 usb_end_right = true; // USB faces +X; false mirrors the whole case
 
+// Tilt the box so the OLED faces up toward your eyes. The box pivots on its
+// front-top edge (bottom swings toward you) and a wedge fills up to the plate.
+// Rule of thumb: tilt = atan(eye height above the dongle / eye distance),
+// e.g. 25 cm above at 60 cm away -> ~23 deg. 0 = the original flat-faced case.
+tilt = 20;
+
 /* ---------- print ---------- */
 wall     = 1.6;
 front_t  = 1.2;   // front wall with the window
@@ -92,6 +98,8 @@ nx0   = nx1 - board_l;          // nRFMicro antenna end
 ox1   = cx0 + fit + oled_l;     // OLED non-pin end (pins at the antenna end)
 win_cx = ox1 - glass_off - glass_l/2 + win_dx;
 
+module tilted() { translate([0, y0, zt]) rotate([-tilt, 0, 0]) translate([0, -y0, -zt]) children(); }
+
 module xmirror() { if (usb_end_right) children(); else translate([L,0,0]) mirror([1,0,0]) children(); }
 
 module profile() { // YZ profile of plate + jaws, extruded along X
@@ -111,23 +119,30 @@ module clip() {
     difference() {
       union() {
         rotate([90,0,90]) linear_extrude(L) profile();
-        translate([0, y0, zb - wall]) cube([L, yback - y0, cav_h + wall + 0.01]);
+        tilted() translate([0, y0, zb - wall]) cube([L, yback - y0, cav_h + wall + 0.01]);
+        // wedge between the tilted box top and the plate underside
+        hull() {
+          translate([0, y0, -plate - 0.01]) cube([L, (yback - y0) * cos(tilt), 0.01]);
+          tilted() translate([0, y0, zt]) cube([L, yback - y0, 0.01]);
+        }
       }
-      // cavity, open at the back
-      translate([cx0, yf, zb]) cube([cav_l, cav_d + 1, cav_h]);
-      // OLED window, chamfered outward for viewing angle
-      translate([win_cx, y0 - 0.01, zc + win_dz]) rotate([-90,0,0])
-        linear_extrude(front_t + 0.02, scale = [win_l/(win_l + 2*front_t), win_h/(win_h + 2*front_t)])
-          square([win_l + 2*front_t, win_h + 2*front_t], center = true);
-      // USB-C opening, sized for a typical plug overmold
-      translate([cx1 - 1, yn + board_t + usb_h/2 - 3.75, zc - 6.25]) cube([usb_wall + 2, 7.5, 12.5]);
-      // snap grooves (top + bottom inner walls) for the lid skirt
-      // (centred on the lid nubs, which sit at yback-1.5 .. yback-0.7)
-      for (z = [zb - snap - 0.1, zt - 0.01])
-        translate([L/2 - 8, yback - 0.6 - 1.0, z]) cube([16, 1.0, snap + 0.11]);
+      tilted() {
+        // cavity, open at the back
+        translate([cx0, yf, zb]) cube([cav_l, cav_d + 1, cav_h]);
+        // OLED window, chamfered outward for viewing angle
+        translate([win_cx, y0 - 0.01, zc + win_dz]) rotate([-90,0,0])
+          linear_extrude(front_t + 0.02, scale = [win_l/(win_l + 2*front_t), win_h/(win_h + 2*front_t)])
+            square([win_l + 2*front_t, win_h + 2*front_t], center = true);
+        // USB-C opening, sized for a typical plug overmold
+        translate([cx1 - 1, yn + board_t + usb_h/2 - 3.75, zc - 6.25]) cube([usb_wall + 2, 7.5, 12.5]);
+        // snap grooves (top + bottom inner walls) for the lid skirt
+        // (centred on the lid nubs, which sit at yback-1.5 .. yback-0.7)
+        for (z = [zb - snap - 0.1, zt - 0.01])
+          translate([L/2 - 8, yback - 0.6 - 1.0, z]) cube([16, 1.0, snap + 0.11]);
+      }
     }
     // corner posts: hold the OLED against the window and space the nRFMicro off it
-    for (x = [nx0, nx1 - 1.2], z = [zb, zt - 2])
+    tilted() for (x = [nx0, nx1 - 1.2], z = [zb, zt - 2])
       translate([x, yf + oled_t, z]) cube([1.2, wire_gap, 2]);
   }
 }
@@ -165,7 +180,7 @@ module lid() { // modelled lying flat: outside face on z = 0, skirt + nubs up
 }
 
 module lid_placed() { // lid in its closed position on the back of the case
-  translate([0, yback + lid_t, zb - wall]) rotate([90, 0, 0]) lid();
+  tilted() translate([0, yback + lid_t, zb - wall]) rotate([90, 0, 0]) lid();
 }
 
 module test() { linear_extrude(10) profile(); } // prints flat, profile on the bed
@@ -178,7 +193,7 @@ module monitor() {
 }
 
 module boards() { // ghost boards for checking fit
-  xmirror() {
+  tilted() xmirror() {
     color("green") translate([nx0, yn, zc - board_w/2]) cube([board_l, board_t, board_w]);
     color("silver") translate([nx1 + usb_over - 7.5, yn + board_t, zc - 4.5]) cube([7.5, usb_h, 9]);
     color("black") translate([cx0 + fit, yf, zc - oled_w/2]) cube([oled_l, oled_t, oled_w]);
@@ -186,7 +201,7 @@ module boards() { // ghost boards for checking fit
 }
 
 if (part == "clip") translate([0, 0, L]) rotate([0, 90, 0]) clip(); // stands on its USB end (flat face on the bed), no supports
-else if (part == "plate") { translate([0, 0, L]) rotate([0, 90, 0]) clip(); translate([-zb + wall + 8, y0, 0]) lid(); } // both parts, print layout
+else if (part == "plate") { translate([0, 0, L]) rotate([0, 90, 0]) clip(); translate([8, y0, 0]) lid(); } // both parts, print layout
 else if (part == "lid") lid();
 else if (part == "test") test();
 else if (part == "assembled") { clip(); lid_placed(); }
